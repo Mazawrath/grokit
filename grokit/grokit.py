@@ -12,6 +12,12 @@ class GrokModels(Enum):
     GROK_2 = 'grok-2'
     GROK_2_MINI = 'grok-2-mini'
 
+class GrokResponse:
+    def __init__(self, conversation_id: str, message: str = None, image_response: str = None):
+        self.conversation_id = conversation_id
+        self.message = message
+        self.image_response = image_response
+
 
 class Grokit:
     BEARER_TOKEN = (
@@ -69,15 +75,24 @@ class Grokit:
         conversation_id: Optional[str] = None,
         system_prompt_name: str = '',
         model_id: Union[GrokModels, str] = GrokModels.GROK_2_MINI,
-    ) -> str:
+    ) -> GrokResponse:
         conversation_id = self._ensure_conversation_id(conversation_id)
-        response = ''.join(self._stream_response(
-            conversation_id,
-            message,
-            system_prompt_name,
-            model_id,
-        ))
-        return response
+
+        # Separate text and image response from the streamed data
+        full_message = []
+        image_response = None
+
+        for response in self._stream_response(conversation_id, message, system_prompt_name, model_id):
+            if response['type'] == 'image':
+                image_response = response['content']
+            elif response['type'] == 'text':
+                full_message.append(response['content'])
+
+        return GrokResponse(
+            conversation_id=conversation_id,
+            message=''.join(full_message),
+            image_response=image_response
+        )
 
     def stream(
         self,
@@ -139,7 +154,7 @@ class Grokit:
         message: str,
         system_prompt_name: str,
         model_id: Union[GrokModels, str],
-    ) -> Generator[str, None, None]:
+    ) -> Generator[dict, None, None]:
         url = 'https://api.x.com/2/grok/add_response.json'
         payload = self._create_add_response_payload(
             conversation_id,
@@ -158,7 +173,7 @@ class Grokit:
         if response.status_code == 200:
             yield from self._process_response_stream(response)
         else:
-            print('Error adding response: {}'.format(response.text))
+            raise RuntimeError(f"Error adding response: {response.text}")
 
     def _make_request(
         self,
@@ -194,15 +209,17 @@ class Grokit:
             'conversationId': conversation_id,
         }
 
-    def _process_response_stream(
-        self,
-        response: requests.Response,
-    ) -> Generator[str, None, None]:
+    def _process_response_stream(self, response: requests.Response) -> Generator[str, None, None]:
         for line in response.iter_lines():
             if line:
                 chunk = json.loads(line)
                 if 'result' in chunk:
-                    if 'message' in chunk['result']:
-                        yield chunk['result']['message']
-                    elif 'imageAttachment' in chunk['result']:
-                        yield json.dumps(chunk)
+                    # Extract imageUrl if it's explicitly an image update
+                    event = chunk['result'].get('event', {})
+                    image_update = event.get('imageAttachmentUpdate', {})
+                    if 'imageUrl' in image_update:
+                        yield {'type': 'image', 'content': image_update['imageUrl']}
+                    # Extract message text explicitly
+                    elif 'message' in chunk['result']:
+                        yield {'type': 'text', 'content': chunk['result']['message']}
+
