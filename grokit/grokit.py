@@ -10,16 +10,20 @@ from os import environ as env
 
 class GrokModels(Enum):
     GROK_2 = 'grok-2'
+    GROK_2A = 'grok-2a'
     GROK_2_MINI = 'grok-2-mini'
 
 class GrokResponse:
-    def __init__(self, conversation_id: str, message: str = None, image_response: str = None):
+    def __init__(self, conversation_id: str, conversation_history: list, message: str, image_response: Optional[list] = None):
         self.conversation_id = conversation_id
         self.message = message
-        self.image_response = image_response
+        self.conversation_history = conversation_history
+        self.image_response = image_response or []
 
 
 class Grokit:
+    print_debug = False
+
     BEARER_TOKEN = (
         'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs'
         '%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA'
@@ -29,12 +33,14 @@ class Grokit:
         self,
         auth_token: Optional[str] = None,
         csrf_token: Optional[str] = None,
+        print_debug: bool = False
     ):
         self.auth_token = auth_token or env.get('X_AUTH_TOKEN')
         self.csrf_token = csrf_token or env.get('X_CSRF_TOKEN')
         self._validate_tokens()
         self.cookie = self._create_cookie()
         self.headers = self._create_headers()
+        self.print_debug = print_debug
 
     def _validate_tokens(self) -> None:
         if not self.auth_token or not self.csrf_token:
@@ -71,27 +77,45 @@ class Grokit:
 
     def generate(
         self,
-        message: str,
+        prompt: str,
+        conversation_history: list = [],
         conversation_id: Optional[str] = None,
         system_prompt_name: str = '',
         model_id: Union[GrokModels, str] = GrokModels.GROK_2_MINI,
     ) -> GrokResponse:
         conversation_id = self._ensure_conversation_id(conversation_id)
+        
+        conversation_history.append({
+            "message": prompt,
+            "sender": 1
+        })
 
-        # Separate text and image response from the streamed data
+        # Collect all messages and image URLs
         full_message = []
-        image_response = None
+        image_responses = []
 
-        for response in self._stream_response(conversation_id, message, system_prompt_name, model_id):
+        for response in self._stream_response(conversation_id, conversation_history, system_prompt_name, model_id):
             if response['type'] == 'image':
-                image_response = response['content']
+                image_responses.append(response['content'])
             elif response['type'] == 'text':
                 full_message.append(response['content'])
+                
+        conversation_history.append({
+            "message": full_message,
+            "sender": 2,
+            "fileAttachments": []
+        })
+        
+        for image in image_responses:
+            conversation_history[len(conversation_history) - 1]["fileAttachments"].append({
+                "fileName": "the file"
+            })
 
         return GrokResponse(
             conversation_id=conversation_id,
+            conversation_history=conversation_history,
             message=''.join(full_message),
-            image_response=image_response
+            image_response=image_responses  # A list of image URLs
         )
 
     def stream(
@@ -151,14 +175,14 @@ class Grokit:
     def _stream_response(
         self,
         conversation_id: str,
-        message: str,
+        conversation_history: list,
         system_prompt_name: str,
         model_id: Union[GrokModels, str],
     ) -> Generator[dict, None, None]:
         url = 'https://api.x.com/2/grok/add_response.json'
         payload = self._create_add_response_payload(
             conversation_id,
-            message,
+            conversation_history,
             system_prompt_name,
             model_id,
         )
@@ -190,17 +214,13 @@ class Grokit:
     def _create_add_response_payload(
         self,
         conversation_id: str,
-        message: str,
+        conversation_history: list,
         system_prompt_name: str,
         model_id: Union[GrokModels, str],
     ) -> Dict[str, Any]:
         return {
-            'responses': [
-                {
-                    'message': message,
-                    'sender': 1,
-                },
-            ],
+            'responses': conversation_history,
+            'imageGenerationCount': 4,
             'systemPromptName': system_prompt_name,
             'grokModelOptionId': (
                 model_id.value if isinstance(model_id, GrokModels)
@@ -209,17 +229,19 @@ class Grokit:
             'conversationId': conversation_id,
         }
 
-    def _process_response_stream(self, response: requests.Response) -> Generator[str, None, None]:
+    def _process_response_stream(self, response: requests.Response) -> Generator[dict, None, None]:
         for line in response.iter_lines():
             if line:
                 chunk = json.loads(line)
+                if self.print_debug:
+                    print(chunk)
                 if 'result' in chunk:
-                    # Extract imageUrl if it's explicitly an image update
+                    # Check for image updates
                     event = chunk['result'].get('event', {})
                     image_update = event.get('imageAttachmentUpdate', {})
-                    if 'imageUrl' in image_update:
+                    if 'imageUrl' in image_update and image_update.get('progress') == 100:
                         yield {'type': 'image', 'content': image_update['imageUrl']}
-                    # Extract message text explicitly
+                    # Extract regular messages
                     elif 'message' in chunk['result']:
                         yield {'type': 'text', 'content': chunk['result']['message']}
 
