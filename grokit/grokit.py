@@ -133,11 +133,18 @@ class Grokit:
             model_id,
         )
 
-    def download_image(self, image_id: int):
+    def download_image(self, input_data):
+        # Check if the input is an integer (ID) or a string (URL)
+        if isinstance(input_data, int):
+            # If it's an integer, use it directly as the image ID
+            image_id = input_data
+        elif isinstance(input_data, str):
+            # If it's a URL, extract the ID from the URL
+            image_id = input_data.split('/')[-1]
+        else:
+            raise ValueError("Input must be either an image ID (int) or an image URL (str)")
+        # Call _get_image with the extracted ID
         return self._get_image(image_id)
-    
-    def download_image(self, image_url: str):
-        return self._get_image(image_url.split('/')[-1])
 
     def _get_image(self, image_id: int):
         return requests.get("https://ton.x.com/i/ton/data/grok-attachment/" + image_id, headers=self.headers)
