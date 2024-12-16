@@ -147,7 +147,10 @@ class Grokit:
         return self._get_image(image_id)
 
     def _get_image(self, image_id: int):
-        return requests.get("https://ton.x.com/i/ton/data/grok-attachment/" + image_id, headers=self.headers)
+        # Ensure the ID is a string for concatenation in the URL
+        url = "https://ton.x.com/i/ton/data/grok-attachment/" + str(image_id)
+        response = requests.get(url, headers=self.headers)
+        return response
 
     def _ensure_conversation_id(self, conversation_id: Optional[str]) -> str:
         if not conversation_id:
