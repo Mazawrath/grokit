@@ -14,11 +14,11 @@ class GrokModels(Enum):
     GROK_2_MINI = 'grok-2-mini'
 
 class GrokResponse:
-    def __init__(self, conversation_id: str, conversation_history: list, message: str, image_response: Optional[list] = None):
+    def __init__(self, conversation_id: str, conversation_history: list, response: str, image_responses: Optional[list] = None):
         self.conversation_id = conversation_id
-        self.message = message
+        self.response = response
         self.conversation_history = conversation_history
-        self.image_response = image_response or []
+        self.image_response = image_responses or []
 
 
 class Grokit:
@@ -114,8 +114,8 @@ class Grokit:
         return GrokResponse(
             conversation_id=conversation_id,
             conversation_history=conversation_history,
-            message=''.join(full_message),
-            image_response=image_responses  # A list of image URLs
+            response=''.join(full_message),
+            image_responses=image_responses  # A list of image URLs
         )
 
     def stream(
