@@ -79,6 +79,7 @@ class Grokit:
         self,
         prompt: str,
         conversation_history: list = [],
+        attachments: list = [],
         conversation_id: Optional[str] = None,
         system_prompt_name: str = '',
         model_id: Union[GrokModels, str] = GrokModels.GROK_2_MINI,
@@ -117,21 +118,14 @@ class Grokit:
             response=''.join(full_message),
             image_responses=image_responses  # A list of image URLs
         )
+  
+    def upload_image(self, url: str) -> str:
+        photo = requests.get("https://cdn.discordapp.com/attachments/1069880674330357770/1317023124927156274/image3.png?ex=675e7e5e&is=675d2cde&hm=c58f673030ec1f8eac3401c194494043e58b7d5690af300ac01df3fb33cd4ac8&")
+        print(photo.raw)
+        response = requests.post("https://x.com/i/api/2/grok/attachment.json", headers=self.headers, data=photo.raw)
+        print(response.status_code)
+        print(response.json())
 
-    def stream(
-        self,
-        message: str,
-        conversation_id: Optional[str] = None,
-        system_prompt_name: str = '',
-        model_id: Union[GrokModels, str] = GrokModels.GROK_2_MINI,
-    ) -> Generator[str, None, None]:
-        conversation_id = self._ensure_conversation_id(conversation_id)
-        yield from self._stream_response(
-            conversation_id,
-            message,
-            system_prompt_name,
-            model_id,
-        )
 
     def image(self, prompt: str) -> bytes:
         image_url = self._get_image_url(prompt)
