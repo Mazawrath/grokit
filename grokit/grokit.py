@@ -14,12 +14,12 @@ class GrokModels(Enum):
     GROK_2_MINI = 'grok-2-mini'
 
 class GrokResponse:
-    def __init__(self, conversation_id: str, conversation_history: list, response: str, limited: bool, image_responses: Optional[list] = None):
+    def __init__(self, conversation_id: str, conversation_history: list, response: str, limited: bool, attachments: Optional[list] = None):
         self.conversation_id = conversation_id
         self.conversation_history = conversation_history
         self.response = response
         self.limited = limited
-        self.image_response = image_responses or []
+        self.attachments = attachments or []
 
 
 class Grokit:
@@ -96,17 +96,17 @@ class Grokit:
 
         # Collect all messages and image URLs
         full_message = []
-        image_responses = []
+        attachments = []
         limited = False
 
         for response in self._get_response(conversation_id, conversation_history, system_prompt_name, model_id):
             if response['type'] == 'image':
-                image_responses.append(response['value'])
+                attachments.append(response['value'])
             elif response['type'] == 'content':
                 full_message.append(response['value'])
             elif response['type'] == 'responseType':
-                    if response['value'] == "limiter":
-                        limited = True
+                if response['value'] == "limiter":
+                    limited = True
                 
         conversation_history.append({
             "message": ''.join(full_message),
@@ -114,7 +114,7 @@ class Grokit:
             "fileAttachments": []
         })
         
-        for image in image_responses:
+        for image in attachments:
             conversation_history[len(conversation_history) - 1]["fileAttachments"].append({
                 "fileName": "the file"
             })
@@ -124,7 +124,7 @@ class Grokit:
             conversation_history=conversation_history,
             limited=limited,
             response=''.join(full_message),
-            image_responses=image_responses  # A list of image URLs
+            attachments=attachments  # A list of image URLs
         )
 
     def download_image(self, input_data):
