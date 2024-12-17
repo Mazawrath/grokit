@@ -105,7 +105,8 @@ class Grokit:
             elif response['type'] == 'content':
                 full_message.append(response['value'])
             elif response['type'] == 'responseType':
-                if response['value'] == "limiter":
+                # Apparently 'error' shows up when you reach the limit for image generation too.
+                if response['value'] == "limiter" or response['value'] == "error":
                     limited = True
                 
         conversation_history.append({
