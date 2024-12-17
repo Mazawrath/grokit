@@ -14,10 +14,11 @@ class GrokModels(Enum):
     GROK_2_MINI = 'grok-2-mini'
 
 class GrokResponse:
-    def __init__(self, conversation_id: str, conversation_history: list, response: str, image_responses: Optional[list] = None):
+    def __init__(self, conversation_id: str, conversation_history: list, response: str, limited: bool, image_responses: Optional[list] = None):
         self.conversation_id = conversation_id
-        self.response = response
         self.conversation_history = conversation_history
+        self.response = response
+        self.limited = limited
         self.image_response = image_responses or []
 
 
@@ -96,12 +97,16 @@ class Grokit:
         # Collect all messages and image URLs
         full_message = []
         image_responses = []
+        limited = False
 
-        for response in self._stream_response(conversation_id, conversation_history, system_prompt_name, model_id):
+        for response in self._get_response(conversation_id, conversation_history, system_prompt_name, model_id):
             if response['type'] == 'image':
-                image_responses.append(response['content'])
-            elif response['type'] == 'text':
-                full_message.append(response['content'])
+                image_responses.append(response['value'])
+            elif response['type'] == 'content':
+                full_message.append(response['value'])
+            elif response['type'] == 'responseType':
+                    if response['value'] == "limiter":
+                        limited = True
                 
         conversation_history.append({
             "message": ''.join(full_message),
@@ -117,23 +122,9 @@ class Grokit:
         return GrokResponse(
             conversation_id=conversation_id,
             conversation_history=conversation_history,
+            limited=limited,
             response=''.join(full_message),
             image_responses=image_responses  # A list of image URLs
-        )
-
-    def stream(
-        self,
-        message: str,
-        conversation_id: Optional[str] = None,
-        system_prompt_name: str = '',
-        model_id: Union[GrokModels, str] = GrokModels.GROK_2_MINI,
-    ) -> Generator[str, None, None]:
-        conversation_id = self._ensure_conversation_id(conversation_id)
-        yield from self._stream_response(
-            conversation_id,
-            message,
-            system_prompt_name,
-            model_id,
         )
 
     def download_image(self, input_data):
@@ -162,7 +153,7 @@ class Grokit:
                 raise ValueError('Failed to create conversation')
         return conversation_id
 
-    def _stream_response(
+    def _get_response(
         self,
         conversation_id: str,
         conversation_history: list,
@@ -180,12 +171,11 @@ class Grokit:
         response = requests.post(
             url,
             headers=self.headers,
-            json=payload,
-            stream=True,
+            json=payload
         )
 
         if response.status_code == 200:
-            yield from self._process_response_stream(response)
+            return self._process_response_stream(response)
         else:
             raise RuntimeError(f"Error adding response: {response.text}")
 
@@ -230,8 +220,10 @@ class Grokit:
                     event = chunk['result'].get('event', {})
                     image_update = event.get('imageAttachmentUpdate', {})
                     if 'imageUrl' in image_update and image_update.get('progress') == 100:
-                        yield {'type': 'image', 'content': image_update['imageUrl']}
+                        yield {'type': 'image', 'value': image_update['imageUrl']}
                     # Extract regular messages
-                    elif 'message' in chunk['result']:
-                        yield {'type': 'text', 'content': chunk['result']['message']}
+                    if 'message' in chunk['result']:
+                        yield {'type': 'content', 'value': chunk['result']['message']}
+                    if 'responseType' in chunk['result']:
+                        yield {'type': 'responseType', 'value': chunk['result']['responseType']}
 
