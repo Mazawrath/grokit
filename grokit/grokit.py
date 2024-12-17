@@ -188,8 +188,8 @@ class Grokit:
         if response.status_code == 200:
             return response.json()
         else:
-            print('Error making request: {}'.format(response.text))
-            return None
+            error_response = json.loads(response.text)
+            raise Exception(error_response)
 
     def _create_add_response_payload(
         self,
