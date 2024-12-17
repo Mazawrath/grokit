@@ -78,11 +78,14 @@ class Grokit:
     def generate(
         self,
         prompt: str,
-        conversation_history: list = [],
+        conversation_history: Optional[list] = None,
         conversation_id: Optional[str] = None,
         system_prompt_name: str = '',
         model_id: Union[GrokModels, str] = GrokModels.GROK_2_MINI,
-    ) -> GrokResponse:
+    ) -> GrokResponse:    
+        if conversation_history is None:
+            conversation_history = []  # Initialize a new list if None is passed
+
         conversation_id = self._ensure_conversation_id(conversation_id)
         
         conversation_history.append({
