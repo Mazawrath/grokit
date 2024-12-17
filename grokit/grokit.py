@@ -104,7 +104,7 @@ class Grokit:
                 full_message.append(response['content'])
                 
         conversation_history.append({
-            "message": full_message,
+            "message": ''.join(full_message),
             "sender": 2,
             "fileAttachments": []
         })
