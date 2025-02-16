@@ -14,11 +14,12 @@ class GrokModels(Enum):
     GROK_2_MINI = 'grok-2-mini'
 
 class GrokResponse:
-    def __init__(self, conversation_id: str, conversation_history: list, response: str, image_responses: Optional[list] = None):
+    def __init__(self, conversation_id: str, conversation_history: list, response: str, limited: bool, attachments: Optional[list] = None):
         self.conversation_id = conversation_id
-        self.response = response
         self.conversation_history = conversation_history
-        self.image_response = image_responses or []
+        self.response = response
+        self.limited = limited
+        self.attachments = attachments or []
 
 
 class Grokit:
@@ -78,12 +79,15 @@ class Grokit:
     def generate(
         self,
         prompt: str,
-        conversation_history: list = [],
         attachments: list = [],
+        conversation_history: Optional[list] = None,
         conversation_id: Optional[str] = None,
         system_prompt_name: str = '',
         model_id: Union[GrokModels, str] = GrokModels.GROK_2_MINI,
-    ) -> GrokResponse:
+    ) -> GrokResponse:    
+        if conversation_history is None:
+            conversation_history = []  # Initialize a new list if None is passed
+
         conversation_id = self._ensure_conversation_id(conversation_id)
         
         conversation_history.append({
@@ -93,30 +97,41 @@ class Grokit:
 
         # Collect all messages and image URLs
         full_message = []
-        image_responses = []
+        image_attachments = []
+        image_urls = []
+        limited = False
 
-        for response in self._stream_response(conversation_id, conversation_history, system_prompt_name, model_id):
+        for response in self._get_response(conversation_id, conversation_history, system_prompt_name, model_id):
             if response['type'] == 'image':
-                image_responses.append(response['content'])
-            elif response['type'] == 'text':
-                full_message.append(response['content'])
+                image_attachments.append(response['value'])
+                image_urls.append("https://ton.x.com/i/ton/data/grok-attachment/" + response['value']['mediaIdStr'])
+            elif response['type'] == 'content':
+                full_message.append(response['value'])
+            elif response['type'] == 'responseType':
+                # Apparently 'error' shows up when you reach the limit for image generation too.
+                if response['value'] == "limiter" or response['value'] == "error":
+                    limited = True
                 
         conversation_history.append({
-            "message": full_message,
+            "message": ''.join(full_message),
             "sender": 2,
             "fileAttachments": []
         })
         
-        for image in image_responses:
+        for image in image_attachments:
             conversation_history[len(conversation_history) - 1]["fileAttachments"].append({
-                "fileName": "the file"
+                "fileName": image['fileName'],
+                "mimeType": image['mimeType'],
+                "mediaId": image['mediaId'],
+                "imageUrl": image['imageUrl']
             })
 
         return GrokResponse(
             conversation_id=conversation_id,
             conversation_history=conversation_history,
+            limited=limited,
             response=''.join(full_message),
-            image_responses=image_responses  # A list of image URLs
+            attachments=image_urls  # A list of image URLs
         )
   
     def upload_image(self, url: str) -> str:
@@ -127,37 +142,11 @@ class Grokit:
         print(response.json())
 
 
-    def image(self, prompt: str) -> bytes:
-        image_url = self._get_image_url(prompt)
-        image_response = requests.get(image_url)
-        if image_response.status_code == 200:
-            return image_response.content
-        raise ValueError('Failed to download the image')
-
-    def image_url(self, prompt: str) -> str:
-        return self._get_image_url(prompt)
-
-    def _get_image_url(self, prompt: str) -> str:
-        conversation_id = self.create_conversation()
-        if not conversation_id:
-            raise ValueError('Failed to create conversation')
-        image_prompt = 'Generate an image of "{}"'.format(prompt)
-        response = self._stream_response(
-            conversation_id,
-            image_prompt,
-            '',
-            GrokModels.GROK_2_MINI,
-        )
-
-        for chunk in response:
-            try:
-                data = json.loads(chunk)
-                if 'result' in data and 'imageAttachment' in data['result']:
-                    return data['result']['imageAttachment']['imageUrl']
-            except json.JSONDecodeError:
-                continue
-
-        raise ValueError('Failed to generate the image')
+    def _get_image(self, image_id: int):
+        # Ensure the ID is a string for concatenation in the URL
+        url = "https://ton.x.com/i/ton/data/grok-attachment/" + str(image_id)
+        response = requests.get(url, headers=self.headers)
+        return response
 
     def _ensure_conversation_id(self, conversation_id: Optional[str]) -> str:
         if not conversation_id:
@@ -166,7 +155,7 @@ class Grokit:
                 raise ValueError('Failed to create conversation')
         return conversation_id
 
-    def _stream_response(
+    def _get_response(
         self,
         conversation_id: str,
         conversation_history: list,
@@ -184,12 +173,11 @@ class Grokit:
         response = requests.post(
             url,
             headers=self.headers,
-            json=payload,
-            stream=True,
+            json=payload
         )
 
         if response.status_code == 200:
-            yield from self._process_response_stream(response)
+            return self._process_response_stream(response)
         else:
             raise RuntimeError(f"Error adding response: {response.text}")
 
@@ -202,8 +190,8 @@ class Grokit:
         if response.status_code == 200:
             return response.json()
         else:
-            print('Error making request: {}'.format(response.text))
-            return None
+            error_response = json.loads(response.text)
+            raise Exception(error_response)
 
     def _create_add_response_payload(
         self,
@@ -231,11 +219,11 @@ class Grokit:
                     print(chunk)
                 if 'result' in chunk:
                     # Check for image updates
-                    event = chunk['result'].get('event', {})
-                    image_update = event.get('imageAttachmentUpdate', {})
-                    if 'imageUrl' in image_update and image_update.get('progress') == 100:
-                        yield {'type': 'image', 'content': image_update['imageUrl']}
+                    if 'imageAttachment' in chunk['result']:
+                        yield {'type': 'image', 'value': chunk['result']['imageAttachment']}
                     # Extract regular messages
-                    elif 'message' in chunk['result']:
-                        yield {'type': 'text', 'content': chunk['result']['message']}
+                    if 'message' in chunk['result']:
+                        yield {'type': 'content', 'value': chunk['result']['message']}
+                    if 'responseType' in chunk['result']:
+                        yield {'type': 'responseType', 'value': chunk['result']['responseType']}
 
