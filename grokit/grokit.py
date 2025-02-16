@@ -96,12 +96,14 @@ class Grokit:
 
         # Collect all messages and image URLs
         full_message = []
-        attachments = []
+        image_attachments = []
+        image_urls = []
         limited = False
 
         for response in self._get_response(conversation_id, conversation_history, system_prompt_name, model_id):
             if response['type'] == 'image':
-                attachments.append(response['value'])
+                image_attachments.append(response['value'])
+                image_urls.append("https://ton.x.com/i/ton/data/grok-attachment/" + response['value']['mediaIdStr'])
             elif response['type'] == 'content':
                 full_message.append(response['value'])
             elif response['type'] == 'responseType':
@@ -115,9 +117,12 @@ class Grokit:
             "fileAttachments": []
         })
         
-        for image in attachments:
+        for image in image_attachments:
             conversation_history[len(conversation_history) - 1]["fileAttachments"].append({
-                "fileName": "the file"
+                "fileName": image['fileName'],
+                "mimeType": image['mimeType'],
+                "mediaId": image['mediaId'],
+                "imageUrl": image['imageUrl']
             })
 
         return GrokResponse(
@@ -125,7 +130,7 @@ class Grokit:
             conversation_history=conversation_history,
             limited=limited,
             response=''.join(full_message),
-            attachments=attachments  # A list of image URLs
+            attachments=image_urls  # A list of image URLs
         )
 
     def download_image(self, input_data):
@@ -218,10 +223,8 @@ class Grokit:
                     print(chunk)
                 if 'result' in chunk:
                     # Check for image updates
-                    event = chunk['result'].get('event', {})
-                    image_update = event.get('imageAttachmentUpdate', {})
-                    if 'imageUrl' in image_update and image_update.get('progress') == 100:
-                        yield {'type': 'image', 'value': image_update['imageUrl']}
+                    if 'imageAttachment' in chunk['result']:
+                        yield {'type': 'image', 'value': chunk['result']['imageAttachment']}
                     # Extract regular messages
                     if 'message' in chunk['result']:
                         yield {'type': 'content', 'value': chunk['result']['message']}
