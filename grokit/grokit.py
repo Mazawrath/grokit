@@ -81,7 +81,7 @@ class Grokit:
     def generate(
         self,
         prompt: str,
-        attachments: list = [],
+        attachments: Optional[list] = None,
         conversation_history: Optional[list] = None,
         conversation_id: Optional[str] = None,
         system_prompt_name: str = '',
@@ -94,9 +94,10 @@ class Grokit:
 
         conversation_id = self._ensure_conversation_id(conversation_id)
         
-        # Upload any attachments
-        for attachment in attachments:
-            file_attachments.append(self.upload_image(attachment)[0])
+        if attachments is not None:
+            # Upload any attachments
+            for attachment in attachments:
+                file_attachments.append(self.upload_image(attachment)[0])
         
         conversation_history.append({
             "message": prompt,
@@ -109,8 +110,6 @@ class Grokit:
         file_attachments = []
         image_urls = []
         limited = False
-
-        print(conversation_history)
 
         for response in self._get_response(conversation_id, conversation_history, system_prompt_name, model_id):
             if response['type'] == 'image':
