@@ -3,6 +3,8 @@
 
 import requests
 import json
+import mimetypes
+from io import BytesIO
 from typing import Optional, Generator, Dict, Any, Union
 from enum import Enum
 from os import environ as env
@@ -87,23 +89,32 @@ class Grokit:
     ) -> GrokResponse:    
         if conversation_history is None:
             conversation_history = []  # Initialize a new list if None is passed
+        
+        file_attachments = []
 
         conversation_id = self._ensure_conversation_id(conversation_id)
         
+        # Upload any attachments
+        for attachment in attachments:
+            file_attachments.append(self.upload_image(attachment)[0])
+        
         conversation_history.append({
             "message": prompt,
-            "sender": 1
+            "sender": 1,
+            "fileAttachments": file_attachments
         })
 
         # Collect all messages and image URLs
         full_message = []
-        image_attachments = []
+        file_attachments = []
         image_urls = []
         limited = False
 
+        print(conversation_history)
+
         for response in self._get_response(conversation_id, conversation_history, system_prompt_name, model_id):
             if response['type'] == 'image':
-                image_attachments.append(response['value'])
+                file_attachments.append(response['value'])
                 image_urls.append("https://ton.x.com/i/ton/data/grok-attachment/" + response['value']['mediaIdStr'])
             elif response['type'] == 'content':
                 full_message.append(response['value'])
@@ -111,14 +122,14 @@ class Grokit:
                 # Apparently 'error' shows up when you reach the limit for image generation too.
                 if response['value'] == "limiter" or response['value'] == "error":
                     limited = True
-                
+
         conversation_history.append({
             "message": ''.join(full_message),
             "sender": 2,
             "fileAttachments": []
         })
         
-        for image in image_attachments:
+        for image in file_attachments:
             conversation_history[len(conversation_history) - 1]["fileAttachments"].append({
                 "fileName": image['fileName'],
                 "mimeType": image['mimeType'],
@@ -135,11 +146,35 @@ class Grokit:
         )
   
     def upload_image(self, url: str) -> str:
-        photo = requests.get("https://cdn.discordapp.com/attachments/1069880674330357770/1317023124927156274/image3.png?ex=675e7e5e&is=675d2cde&hm=c58f673030ec1f8eac3401c194494043e58b7d5690af300ac01df3fb33cd4ac8&")
-        print(photo.raw)
-        response = requests.post("https://x.com/i/api/2/grok/attachment.json", headers=self.headers, data=photo.raw)
-        print(response.status_code)
-        print(response.json())
+        # Step 1: Get the image using GET request
+        response = requests.get(url)
+
+        # Check if the request was successful
+        response.raise_for_status()  # Will raise an HTTPError for bad responses
+
+        # Dynamically determine the file extension based on Content-Type
+        content_type = response.headers.get('Content-Type', '')
+        extension = mimetypes.guess_extension(content_type.split(';')[0]) or '.bin'
+
+        # If the content type is an image, we extract the file name
+        if content_type.startswith('image/'):
+            file_name = 'image' + extension
+        else:
+            raise ValueError("The URL did not return an image.")
+
+        # Prepare the headers by removing the 'Content-Type' key
+        upload_image_header = self.headers.copy()
+        upload_image_header.pop('Content-Type', None)  # Ensure 'Content-Type' is removed
+
+        # Step 2: Upload the image via POST request
+        files = {'file': (file_name, BytesIO(response.content), content_type)}
+        upload_response = requests.post("https://x.com/i/api/2/grok/attachment.json", headers=upload_image_header, files=files)
+
+        # Check if the upload was successful
+        upload_response.raise_for_status()
+
+        # Return the response JSON if the request is successful
+        return upload_response.json()
 
 
     def _get_image(self, image_id: int):
