@@ -175,6 +175,18 @@ class Grokit:
         # Return the response JSON if the request is successful
         return upload_response.json()
 
+    def download_image(self, input_data):
+        # Check if the input is an integer (ID) or a string (URL)
+        if isinstance(input_data, int):
+            # If it's an integer, use it directly as the image ID
+            image_id = input_data
+        elif isinstance(input_data, str):
+            # If it's a URL, extract the ID from the URL
+            image_id = input_data.split('/')[-1]
+        else:
+            raise ValueError("Input must be either an image ID (int) or an image URL (str)")
+        # Call _get_image with the extracted ID
+        return self._get_image(image_id)
 
     def _get_image(self, image_id: int):
         # Ensure the ID is a string for concatenation in the URL
