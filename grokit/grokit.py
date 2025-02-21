@@ -82,6 +82,7 @@ class Grokit:
         self,
         prompt: str,
         attachments: Optional[list] = None,
+        edit_attachment: bool = False,
         conversation_history: Optional[list] = None,
         conversation_id: Optional[str] = None,
         system_prompt_name: str = '',
@@ -97,7 +98,14 @@ class Grokit:
         if attachments is not None:
             # Upload any attachments
             for attachment in attachments:
+                # Only upload image if it doesn't belong to the api.x.com/grok/attachment domain
                 file_attachments.append(self.upload_image(attachment)[0])
+
+        if edit_attachment:
+            # Can only upload one imgae to edit, just default to the first one
+            image_edit_attachment = file_attachments[0]['url']
+        else:
+            image_edit_attachment = None
         
         conversation_history.append({
             "message": prompt,
@@ -111,7 +119,7 @@ class Grokit:
         image_urls = []
         limited = False
 
-        for response in self._get_response(conversation_id, conversation_history, system_prompt_name, model_id):
+        for response in self._get_response(conversation_id, conversation_history, image_edit_attachment, system_prompt_name, model_id):
             if response['type'] == 'image':
                 file_attachments.append(response['value'])
                 image_urls.append("https://ton.x.com/i/ton/data/grok-attachment/" + response['value']['mediaIdStr'])
@@ -205,6 +213,7 @@ class Grokit:
         self,
         conversation_id: str,
         conversation_history: list,
+        image_edit_attachement: str | None,
         system_prompt_name: str,
         model_id: Union[GrokModels, str],
     ) -> Generator[dict, None, None]:
@@ -212,6 +221,7 @@ class Grokit:
         payload = self._create_add_response_payload(
             conversation_id,
             conversation_history,
+            image_edit_attachement,
             system_prompt_name,
             model_id,
         )
@@ -238,15 +248,35 @@ class Grokit:
         else:
             error_response = json.loads(response.text)
             raise Exception(error_response)
+        
+    def _create_prompt_metadata(
+        self,
+        image_edit_attachement: str | None
+    ) -> Dict[str, Any]:
+        return {
+            "action": "INPUT",
+            "promptSource": (
+                "IMAGE_EDIT" if image_edit_attachement is not None
+                else "NATURAL"
+            ),
+            "properties": {
+                "imageUrl": image_edit_attachement if image_edit_attachement is not None 
+                else None
+            }
+        }
 
     def _create_add_response_payload(
         self,
         conversation_id: str,
         conversation_history: list,
+        image_edit_attachement: str | None,
         system_prompt_name: str,
         model_id: Union[GrokModels, str],
     ) -> Dict[str, Any]:
         return {
+            'promptMetadata': (
+                self._create_prompt_metadata(image_edit_attachement)
+            ),
             'responses': conversation_history,
             'imageGenerationCount': 4,
             'systemPromptName': system_prompt_name,
