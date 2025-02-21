@@ -4,6 +4,7 @@
 import requests
 import json
 import mimetypes
+from PIL import Image
 from io import BytesIO
 from typing import Optional, Generator, Dict, Any, Union
 from enum import Enum
@@ -99,7 +100,7 @@ class Grokit:
             # Upload any attachments
             for attachment in attachments:
                 # Only upload image if it doesn't belong to the api.x.com/grok/attachment domain
-                file_attachments.append(self.upload_image(attachment)[0])
+                file_attachments.append(self.upload_image(attachment, resize_image=edit_attachment)[0])
 
         if edit_attachment:
             # Can only upload one imgae to edit, just default to the first one
@@ -152,7 +153,7 @@ class Grokit:
             attachments=image_urls  # A list of image URLs
         )
   
-    def upload_image(self, url: str) -> str:
+    def upload_image(self, url: str, resize_image: bool = False) -> str:
         # Step 1: Get the image using GET request
         response = requests.get(url)
 
@@ -169,12 +170,25 @@ class Grokit:
         else:
             raise ValueError("The URL did not return an image.")
 
+        # Resize the image if resize_image is True
+        if resize_image:
+            image = Image.open(BytesIO(response.content))
+            image = image.resize((1024, 768))
+            image_bytes = BytesIO()
+            # Explicitly set the format to 'PNG' or 'JPEG' based on the original content type
+            image_format = 'PNG' if content_type == 'image/png' else 'JPEG'
+            image.save(image_bytes, format=image_format)
+            image_bytes.seek(0)
+            file_content = image_bytes
+        else:
+            file_content = BytesIO(response.content)
+
         # Prepare the headers by removing the 'Content-Type' key
         upload_image_header = self.headers.copy()
         upload_image_header.pop('Content-Type', None)  # Ensure 'Content-Type' is removed
 
         # Step 2: Upload the image via POST request
-        files = {'file': (file_name, BytesIO(response.content), content_type)}
+        files = {'file': (file_name, file_content, content_type)}
         upload_response = requests.post("https://x.com/i/api/2/grok/attachment.json", headers=upload_image_header, files=files)
 
         # Check if the upload was successful
