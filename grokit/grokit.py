@@ -270,12 +270,12 @@ class Grokit:
         return {
             "action": "INPUT",
             "promptSource": (
-                "IMAGE_EDIT" if image_edit_attachement is not None
+                "FOLLOW_UP" if image_edit_attachement is not None
                 else "NATURAL"
             ),
             "properties": {
-                "imageUrl": image_edit_attachement if image_edit_attachement is not None 
-                else None
+                "followUpType": "MODIFY" if image_edit_attachement is not None else None,
+                "messageType": "IMAGE_GEN" if image_edit_attachement is not None else None
             }
         }
 
