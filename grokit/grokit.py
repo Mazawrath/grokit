@@ -231,7 +231,7 @@ class Grokit:
         system_prompt_name: str,
         model_id: Union[GrokModels, str],
     ) -> Generator[dict, None, None]:
-        url = 'https://api.x.com/2/grok/add_response.json'
+        url = 'https://grok.x.com/2/grok/add_response.json'
         payload = self._create_add_response_payload(
             conversation_id,
             conversation_history,
