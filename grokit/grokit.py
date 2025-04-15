@@ -37,10 +37,12 @@ class Grokit:
         self,
         auth_token: Optional[str] = None,
         csrf_token: Optional[str] = None,
+        x_client_transaction_id: Optional[str] = None,
         print_debug: bool = False
     ):
         self.auth_token = auth_token or env.get('X_AUTH_TOKEN')
         self.csrf_token = csrf_token or env.get('X_CSRF_TOKEN')
+        self.x_client_transaction_id = x_client_transaction_id or env.get('X_CLIENT_TRANSACTION_ID')
         self._validate_tokens()
         self.cookie = self._create_cookie()
         self.headers = self._create_headers()
@@ -59,6 +61,7 @@ class Grokit:
     def _create_headers(self) -> Dict[str, str]:
         return {
             'X-Csrf-Token': self.csrf_token,
+            'x-client-transaction-id': self.x_client_transaction_id,
             'authorization': 'Bearer {}'.format(self.BEARER_TOKEN),
             'Content-Type': 'application/json',
             'Cookie': self.cookie,
