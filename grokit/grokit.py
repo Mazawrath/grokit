@@ -17,10 +17,10 @@ class GrokModels(Enum):
     GROK_2_MINI = 'grok-2-mini'
 
 class GrokResponse:
-    def __init__(self, conversation_id: str, conversation_history: list, response: str, limited: bool, attachments: Optional[list] = None):
+    def __init__(self, conversation_id: str, conversation_history: list, message: str, limited: bool, attachments: Optional[list] = None):
         self.conversation_id = conversation_id
         self.conversation_history = conversation_history
-        self.response = response
+        self.message = message
         self.limited = limited
         self.attachments = attachments or []
 
@@ -152,7 +152,7 @@ class Grokit:
             conversation_id=conversation_id,
             conversation_history=conversation_history,
             limited=limited,
-            response=''.join(full_message),
+            message=''.join(full_message),
             attachments=image_urls  # A list of image URLs
         )
   
