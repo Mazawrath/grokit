@@ -12,7 +12,7 @@
 ## Installation
 
 ```bash
-pip install grokit
+pip install git+https://github.com/Mazawrath/grokit
 ```
 
 ## Usage
