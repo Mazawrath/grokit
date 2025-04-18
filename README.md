@@ -1,11 +1,12 @@
 <div align="center">
   <img src="./misc/grokit.svg" alt="Logo" height="70" />
-  <p><strong>Unofficial Python client for Grok models</strong></p>
+  <p><strong>Unofficial Forked Python client for Grok models</strong></p>
+  <p>Original repository by EveripediaNetwork</p>
 </div>
 <br/>
 
 <p align="center">
-    <a href="https://pypi.python.org/pypi/grokit/"><img alt="PyPi" src="https://img.shields.io/pypi/v/grokit.svg?style=flat-square"></a>
+<!--     <a href="https://pypi.python.org/pypi/grokit/"><img alt="PyPi" src="https://img.shields.io/pypi/v/grokit.svg?style=flat-square"></a> -->
     <a href="https://github.com/EveripediaNetwork/grokit/blob/master/LICENSE"><img alt="License" src="https://img.shields.io/github/license/EveripediaNetwork/grokit.svg?style=flat-square"></a>
 </p>
 
@@ -21,7 +22,7 @@ Import the `Grokit` class and create an instance:
 ```python
 from grokit import Grokit
 
-# You can set the X_AUTH_TOKEN and X_CSRF_TOKEN environment variables instead
+# You can set the X_AUTH_TOKEN, X_CSRF_TOKEN, and X_CLIENT_TRANSACTION_ID environment variables instead
 grok = Grokit(
     auth_token='***',
     csrf_token='***',
