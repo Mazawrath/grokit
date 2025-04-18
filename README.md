@@ -25,6 +25,7 @@ from grokit import Grokit
 grok = Grokit(
     auth_token='***',
     csrf_token='***',
+    x_client_transaction_id='***'
 )
 ```
 
@@ -70,12 +71,16 @@ To obtain the necessary credentials for using Grokit, follow these steps:
 
 4. Load [x.com/i/grok](https://x.com/i/grok) in your browser.
 
-5. In the Network tab, look for the first request.
+5. Type anything in the textbox and send it.
 
-6. Click on this request to view its details.
+6. In the Network tab, look for the `POST` request to `https://grok.x.com/2/grok/add_response.json`.
 
-7. In the Headers section, find the "Cookie" header under Request Headers.
+7. Click on this request to view its details.
 
-8. From the cookie string, extract the following values:
+9. In the Headers section, find the "Cookie" header under Request Headers.
+
+10. From the cookie string, extract the following values:
    - `ct0`: This is your csrf token
    - `auth_token`: This is your auth token
+
+11. In the Headers section, find the `x-client-transaction-id` under Request Headers.
