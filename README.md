@@ -1,7 +1,6 @@
 <div align="center">
   <img src="./misc/grokit.svg" alt="Logo" height="70" />
   <p><strong>Unofficial Forked Python client for Grok models</strong></p>
-  <p>Original repository by EveripediaNetwork</p>
 </div>
 <br/>
 
