@@ -33,32 +33,63 @@ grok = Grokit(
 ## Generate Text
 
 ```python
-response = grok.generate('Who are you?', model_id='grok-2-mini')
-print(response)
-```
-
-## Stream Text
-
-```python
-for chunk in grok.stream('Who are you?', model_id='grok-2'):
-    print(chunk, end='', flush=True)
+response = grok.generate(
+    prompt='Who are you?',
+    model_id='grok-3'
+)
+print(response.message)  # Access the generated response text
 ```
 
 ## Generate Images
 
-### JPEG binary
+### Upload an image and generate a response
 ```python
-image_data = grok.image('An astronaut riding a horse.')
-
-with open('image.jpg', 'wb') as f:
-    f.write(image_data)
+response = grok.generate(
+    prompt='Describe this image.',
+    attachments=['https://example.com/image.jpg']
+)
+print(response.message)  # Access the generated response text
 ```
 
-### image URL
+### Generate an image URL
 ```python
-image_url = grok.image_url('An astronaut riding a horse.')
-print(image_url)
+response = grok.generate(
+    prompt='An astronaut riding a horse.',
+    model_id='grok-2',
+)
+print(response.attachments)  # List of generated image URLs
 ```
+
+### Upload an image to edit and generate a response
+```python
+response = grok.generate(
+    prompt='Make this image look like a painting.',
+    attachments=['https://example.com/image.jpg'],
+    edit_attachment=True
+)
+print(response.message)  # Access the generated response text
+```
+
+In this case, the first image in the `attachments` list will be used for editing. The `edit_attachment` parameter must be set to `True` to enable image editing.
+
+## Download Images
+
+### Download an image by ID or URL
+You can download an image using its ID or URL:
+
+```python
+# Download by image ID
+response = grok.download_image(123456789)
+
+# Download by image URL
+response = grok.download_image('https://ton.x.com/i/ton/data/grok-attachment/123456789')
+
+# Save the image to a file
+with open('downloaded_image.jpg', 'wb') as f:
+    f.write(response.content)
+```
+
+The `download_image` method accepts either an image ID (integer) or a full image URL (string). The response contains the image data, which can be saved to a file.
 
 ## Credentials
 
@@ -78,10 +109,10 @@ To obtain the necessary credentials for using Grokit, follow these steps:
 
 7. Click on this request to view its details.
 
-9. In the Headers section, find the "Cookie" header under Request Headers.
+8. In the Headers section, find the "Cookie" header under Request Headers.
 
-10. From the cookie string, extract the following values:
+9. From the cookie string, extract the following values:
    - `ct0`: This is your csrf token
    - `auth_token`: This is your auth token
 
-11. In the Headers section, find the `x-client-transaction-id` under Request Headers.
+10. In the Headers section, find the `x-client-transaction-id` under Request Headers.
