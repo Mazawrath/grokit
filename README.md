@@ -55,7 +55,7 @@ print(response.message)  # Access the generated response text
 ```python
 response = grok.generate(
     prompt='An astronaut riding a horse.',
-    model_id='grok-2',
+    model_id='grok-3',
 )
 print(response.attachments)  # List of generated image URLs
 ```
