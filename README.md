@@ -95,13 +95,13 @@ The `download_image` method accepts either an image ID (integer) or a full image
 
 To obtain the necessary credentials for using Grokit, follow these steps:
 
-1. Log in to [x.com](https://x.com) with a Premium account.
+1. Log in to [twitter.com](https://twitter.com).
 
 2. Open your browser's Developer Tools.
 
 3. Navigate to the Network tab in the Developer Tools.
 
-4. Load [x.com/i/grok](https://x.com/i/grok) in your browser.
+4. Load [twitter.com/i/grok](https://twitter.com/i/grok) in your browser.
 
 5. Type anything in the textbox and send it.
 
